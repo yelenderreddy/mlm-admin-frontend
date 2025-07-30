@@ -15,7 +15,7 @@ export const config = {
     MAX_FILE_SIZE: 5242880,
     ALLOWED_TYPES: [
       'image/jpeg',
-      'image/png',
+      'image/png', 
       'image/gif',
       'image/webp'
     ],
@@ -97,4 +97,4 @@ export const logDebug = (message, data = null) => {
 
 export const logError = (message, error = null) => {
   console.error(`[ERROR] ${message}`, error);
-}; 
+};

@@ -32,6 +32,7 @@ export default function Members() {
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
 
+  ///delete/:id
   // Fetch milestones (unchanged)
   const fetchMilestones = useCallback(async () => {
     try {
@@ -142,24 +143,31 @@ export default function Members() {
     }
   };
 
-  // Delete member
-  const handleDelete = async (memberId) => {
-    if (!window.confirm("Are you sure you want to delete this member?")) return;
-    try {
-      const token = localStorage.getItem('adminToken');
-      const response = await fetch(`${BASE_URL}/api/admin/users/${memberId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        }
-      });
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-      setMembers(members.filter(m => m.id !== memberId));
-    } catch (err) {
-      logError('Failed to delete member', err);
+// Delete member
+const handleDelete = async (memberId) => {
+  if (!window.confirm("Are you sure you want to delete this member?")) return;
+  try {
+    const token = localStorage.getItem('adminToken');
+    const response = await fetch(`${BASE_URL}/api/users/delete/${memberId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      }
+    });
+    const result = await response.json().catch(() => null);
+    if (!response.ok) {
+      throw new Error(result?.message || `HTTP error! status: ${response.status}`);
     }
-  };
+    // remove from ui state
+    setMembers(prev => prev.filter(m => m.id !== memberId));
+    alert(result?.message || "Member deleted successfully");
+  } catch (err) {
+    logError('Failed to delete member', err);
+    alert(err.message || "Delete failed");
+  }
+};
+
 
   // Export CSV
   const handleExportCSV = () => {
