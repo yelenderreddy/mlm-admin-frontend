@@ -1,0 +1,14 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Poppins:wght@400;600;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: 'Inter', 'Poppins', sans-serif;
+  background: #f3f4f6;
+}
+
+.dark body {
+  background: #181926;
+  color: #e5e7eb;
+}
