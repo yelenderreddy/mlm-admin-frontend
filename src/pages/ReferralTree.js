@@ -40,6 +40,19 @@ function TreeNode({ node, level = 1, maxLevel = 4 }) {
             {node.email && (
               <div className="text-xs text-slate-500 dark:text-slate-300">Email: {node.email}</div>
             )}
+            {node.mobileNumber && (
+              <div className="text-xs text-slate-500 dark:text-slate-300">Mobile: {node.mobileNumber}</div>
+            )}
+            {node.referralCode && (
+              <div className="text-xs text-slate-500 dark:text-slate-300">Code: {node.referralCode}</div>
+            )}
+            {node.status && (
+              <div className="text-xs text-slate-500 dark:text-slate-300">
+                Status: <span className={`px-1 py-0.5 rounded text-xs ${
+                  node.status === 'PAID' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                }`}>{node.status}</span>
+              </div>
+            )}
           </div>
           {node.children && node.children.length > 0 && level < maxLevel && (
             <button
@@ -135,6 +148,72 @@ export default function ReferralTree() {
     }
   }, []);
 
+  // Fetch users by referral code
+  const fetchUsersByReferralCode = useCallback(async (referralCode) => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      logDebug(`Fetching users referred by ${referralCode}`);
+      
+      const response = await fetch(ADMIN_ENDPOINTS.USERS.REFERRED_BY(referralCode), {
+        headers: getAdminHeaders()
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      logDebug('Users referred by code data received', data);
+      
+      if (data.data && data.data.length > 0) {
+        // Create a tree structure from the referred users
+        const referredUsers = data.data.map(user => ({
+          id: user.id,
+          name: user.name || 'Unknown',
+          email: user.email,
+          joinDate: user.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A',
+          totalReferrals: user.referralCount || 0,
+          wallet: 0, // Default wallet value
+          children: [], // No children for now
+          referralCode: user.referral_code,
+          status: user.payment_status,
+          mobileNumber: user.mobileNumber,
+          address: user.address,
+          gender: user.gender,
+          referredByCode: user.referred_by_code,
+        }));
+
+        // Create a root node with the referral code
+        const rootNode = {
+          id: 0,
+          name: `Referral Code: ${referralCode}`,
+          email: '',
+          joinDate: 'N/A',
+          totalReferrals: referredUsers.length,
+          wallet: 0,
+          children: referredUsers,
+          referralCode: referralCode,
+          status: 'ACTIVE',
+        };
+
+        setRoot(rootNode);
+      } else {
+        setRoot({
+          ...defaultTree,
+          name: `No users found for referral code: ${referralCode}`,
+        });
+      }
+    } catch (err) {
+      logError('Failed to fetch users by referral code', err);
+      setError(err.message);
+      setRoot(defaultTree);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   // Search for users
   const searchUsers = useCallback(async (query) => {
     if (!query.trim()) {
@@ -182,7 +261,16 @@ export default function ReferralTree() {
   const handleSearch = (e) => {
     e.preventDefault();
     if (search.trim()) {
-      searchUsers(search);
+      // Check if the search looks like a referral code (alphanumeric, 8 characters)
+      const isReferralCode = /^[A-Za-z0-9]{8}$/.test(search.trim());
+      
+      if (isReferralCode) {
+        // Search by referral code
+        fetchUsersByReferralCode(search.trim());
+      } else {
+        // Search by user name/email
+        searchUsers(search);
+      }
     }
   };
 
@@ -262,7 +350,7 @@ export default function ReferralTree() {
           <div className="relative flex-1">
             <input
               type="text"
-              placeholder="Search member by name, email, or referral code"
+              placeholder="Search member by name, email, or referral code (8 characters)"
               value={search}
               onChange={handleSearchChange}
               className="px-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-400 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 w-full"

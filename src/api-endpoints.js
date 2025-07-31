@@ -8,6 +8,7 @@ export const ADMIN_ENDPOINTS = {
     UPDATE_STATUS: (id) => `${BASE_URL}/admin/users/status/${id}`,
     RESET_PASSWORD: (id) => `${BASE_URL}/admin/users/${id}/reset-password`,
     DELETE: (id) => `${BASE_URL}/admin/users/${id}`,
+    REFERRED_BY: (referralCode) => `${BASE_URL}/api/users/referredBy/${referralCode}`,
   },
   PRODUCTS: {
     LIST: `${BASE_URL}/admin/products`,
@@ -38,6 +39,8 @@ export const ADMIN_ENDPOINTS = {
     CANCEL: (id) => `${BASE_URL}/admin/orders/${id}/cancel`,
     REFUND: (id) => `${BASE_URL}/admin/orders/${id}/refund`,
     STATS: `${BASE_URL}/admin/orders/stats/summary`,
+    ORDER_DETAILS: `${BASE_URL}/product/order-details/all`,
+    UPDATE_ORDER_STATUS: (id) => `${BASE_URL}/product/order-status/${id}`,
   },
   REWARDS: {
     LIST: `${BASE_URL}/admin/rewards`,

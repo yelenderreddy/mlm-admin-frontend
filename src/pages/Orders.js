@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
+import ActionMenu from "./ActionMenu";
 import { ADMIN_ENDPOINTS, getAdminHeaders } from '../api-endpoints';
 import { logDebug, logError } from '../config';
 
-const orderStatuses = ["All", "Pending", "Processing", "Shipped", "Delivered", "Cancelled"];
+const orderStatuses = ["All", "Packing", "packed", "Delivered", "Cancelled", "confirmed"];
 const orderTypes = ["All", "Direct", "Referral", "Gift"];
 
 export default function Orders() {
@@ -19,30 +20,34 @@ export default function Orders() {
   });
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [showOrderModal, setShowOrderModal] = useState(false);
+  const [showUserModal, setShowUserModal] = useState(false);
+  const [showProductModal, setShowProductModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [selectedProduct, setSelectedProduct] = useState(null);
   const [summary, setSummary] = useState({
     totalOrders: 0,
     totalRevenue: 0,
     pendingOrders: 0,
     completedOrders: 0,
   });
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 10,
+    total: 0,
+    totalPages: 1,
+    hasNext: false,
+    hasPrev: false,
+  });
 
-  // Fetch orders data
-  const fetchOrders = useCallback(async () => {
+  // Fetch orders data from new API
+  const fetchOrders = useCallback(async (page = 1, limit = 10) => {
     try {
       setLoading(true);
       setError(null);
       
-      logDebug('Fetching orders data');
+      logDebug('Fetching orders data from new API');
       
-      // Build query parameters
-      const params = new URLSearchParams();
-      if (filters.status !== 'All') params.append('status', filters.status);
-      if (filters.type !== 'All') params.append('type', filters.type);
-      if (filters.dateFrom) params.append('dateFrom', filters.dateFrom);
-      if (filters.dateTo) params.append('dateTo', filters.dateTo);
-      if (filters.customer) params.append('customer', filters.customer);
-      
-      const response = await fetch(`${ADMIN_ENDPOINTS.ORDERS.LIST}?${params.toString()}`, {
+      const response = await fetch(`${ADMIN_ENDPOINTS.ORDERS.ORDER_DETAILS}?page=${page}&limit=${limit}`, {
         headers: getAdminHeaders()
       });
 
@@ -53,37 +58,54 @@ export default function Orders() {
       const responseData = await response.json();
       logDebug('Orders data received', responseData);
       
-      // Handle different response formats - now using dedicated orders endpoint
-      let data = [];
-      if (Array.isArray(responseData)) {
-        data = responseData;
-      } else if (responseData && Array.isArray(responseData.data)) {
-        data = responseData.data;
-      } else {
-        logDebug('No valid orders array found in response, using empty array');
-        data = [];
-      }
-      
-      // Transform API data to match our UI structure
-      const transformedOrders = data.map(order => ({
-        id: order.id,
-        orderNumber: order.orderNumber || order.orderId || `#${order.id}`,
-        customer: order.user?.name || order.customerName || order.customer || order.userName || 'Unknown',
-        customerId: order.userId || order.user?.id || order.customerId,
-        products: order.items || order.products || [],
-        totalAmount: order.total || order.totalAmount || order.amount || 0,
-        status: order.status || 'Pending',
-        type: order.type || order.orderType || 'Direct',
-        orderDate: order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'N/A',
-        shippingAddress: order.shippingAddress || order.address || 'N/A',
-        paymentMethod: order.paymentMethod || 'N/A',
-        paymentStatus: order.paymentStatus || 'Pending',
-        trackingNumber: order.trackingNumber || 'N/A',
-        notes: order.notes || '',
-        collected: order.collected || false,
-      }));
+      if (responseData.data && responseData.data.orders) {
+        const transformedOrders = responseData.data.orders.map(order => ({
+          id: order.id,
+          orderNumber: `#${order.id}`,
+          customer: order.userName || 'Unknown',
+          customerId: order.userId,
+          customerEmail: order.userEmail,
+          customerMobile: order.userMobile,
+          customerAddress: order.userAddress,
+          customerGender: order.userGender,
+          customerReferralCode: order.userReferralCode,
+          customerPaymentStatus: order.userPaymentStatus,
+          products: [{
+            id: order.productId,
+            name: order.productName,
+            price: order.productPrice || 0,
+            quantity: order.quantity,
+            productCount: order.productCount,
+            productStatus: order.productStatus,
+            productCode: order.productCode,
+          }],
+          totalAmount: (order.productPrice || 0) * order.quantity,
+          status: order.status || 'Pending',
+          type: 'Direct', // Default type since it's not in the API
+          orderDate: order.orderedAt ? new Date(order.orderedAt).toLocaleDateString() : 'N/A',
+          shippingAddress: order.userAddress || 'N/A',
+          paymentMethod: 'N/A',
+          paymentStatus: order.userPaymentStatus || 'Pending',
+          trackingNumber: 'N/A',
+          notes: '',
+          collected: false,
+          // Store original data for modals
+          originalData: order,
+        }));
 
-      setOrders(transformedOrders);
+        setOrders(transformedOrders);
+        setPagination(responseData.data.pagination);
+      } else {
+        setOrders([]);
+        setPagination({
+          page: 1,
+          limit: 10,
+          total: 0,
+          totalPages: 1,
+          hasNext: false,
+          hasPrev: false,
+        });
+      }
     } catch (err) {
       logError('Failed to fetch orders', err);
       setError(err.message);
@@ -91,7 +113,7 @@ export default function Orders() {
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, []);
 
   // Fetch order statistics
   const fetchOrderStats = useCallback(async () => {
@@ -121,11 +143,24 @@ export default function Orders() {
     }
   }, []);
 
-  // Load data on component mount and when filters change
+  // Load data on component mount and when pagination changes
   useEffect(() => {
-    fetchOrders();
+    fetchOrders(pagination.page, pagination.limit);
     fetchOrderStats();
-  }, [fetchOrders, fetchOrderStats]);
+  }, [fetchOrders, fetchOrderStats, pagination.page, pagination.limit]);
+
+  // Pagination controls
+  const handlePrevPage = () => {
+    if (pagination.hasPrev) {
+      setPagination(prev => ({ ...prev, page: prev.page - 1 }));
+    }
+  };
+
+  const handleNextPage = () => {
+    if (pagination.hasNext) {
+      setPagination(prev => ({ ...prev, page: prev.page + 1 }));
+    }
+  };
 
   // Filter logic
   const filtered = orders.filter((order) => {
@@ -142,7 +177,7 @@ export default function Orders() {
     try {
       logDebug(`Updating order ${orderId} status to ${newStatus}`);
       
-      const response = await fetch(ADMIN_ENDPOINTS.ORDERS.UPDATE_STATUS(orderId), {
+      const response = await fetch(ADMIN_ENDPOINTS.ORDERS.UPDATE_ORDER_STATUS(orderId), {
         method: 'PUT',
         headers: getAdminHeaders(),
         body: JSON.stringify({ status: newStatus })
@@ -151,6 +186,9 @@ export default function Orders() {
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
+
+      const result = await response.json();
+      logDebug('Order status update response', result);
 
       // Update local state
       setOrders(prevOrders => 
@@ -172,6 +210,36 @@ export default function Orders() {
     setShowOrderModal(true);
   };
 
+  // View user details
+  const handleViewUser = (order) => {
+    setSelectedUser({
+      id: order.customerId,
+      name: order.customer,
+      email: order.customerEmail,
+      mobile: order.customerMobile,
+      address: order.customerAddress,
+      gender: order.customerGender,
+      referralCode: order.customerReferralCode,
+      paymentStatus: order.customerPaymentStatus,
+    });
+    setShowUserModal(true);
+  };
+
+  // View product details
+  const handleViewProduct = (order) => {
+    const product = order.products[0];
+    setSelectedProduct({
+      id: product.id,
+      name: product.name,
+      price: product.price,
+      quantity: product.quantity,
+      productCount: product.productCount,
+      productStatus: product.productStatus,
+      productCode: product.productCode,
+    });
+    setShowProductModal(true);
+  };
+
   // Calculate summary statistics
   const getStatusColor = (status) => {
     switch (status) {
@@ -180,6 +248,7 @@ export default function Orders() {
       case 'Shipped': return 'bg-purple-100 text-purple-800';
       case 'Delivered': return 'bg-green-100 text-green-800';
       case 'Cancelled': return 'bg-red-100 text-red-800';
+      case 'confirmed': return 'bg-green-100 text-green-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -193,6 +262,119 @@ export default function Orders() {
     }
   };
 
+  // User Details Modal
+  const UserModal = () => (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl max-w-md w-full">
+        <div className="p-6">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-bold">User Details</h2>
+            <button
+              onClick={() => setShowUserModal(false)}
+              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+            >
+              ✕
+            </button>
+          </div>
+          
+          {selectedUser && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Name</label>
+                  <p className="text-lg font-semibold">{selectedUser.name}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Email</label>
+                  <p className="text-lg">{selectedUser.email}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Mobile</label>
+                  <p className="text-lg">{selectedUser.mobile}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Gender</label>
+                  <p className="text-lg">{selectedUser.gender || 'N/A'}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Referral Code</label>
+                  <p className="text-lg font-mono">{selectedUser.referralCode}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Payment Status</label>
+                  <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                    selectedUser.paymentStatus === 'PAID' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                  }`}>
+                    {selectedUser.paymentStatus}
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-gray-500">Address</label>
+                <p className="text-sm mt-1">{selectedUser.address || 'N/A'}</p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
+  // Product Details Modal
+  const ProductModal = () => (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl max-w-md w-full">
+        <div className="p-6">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-bold">Product Details</h2>
+            <button
+              onClick={() => setShowProductModal(false)}
+              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+            >
+              ✕
+            </button>
+          </div>
+          
+          {selectedProduct && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Product Name</label>
+                  <p className="text-lg font-semibold">{selectedProduct.name}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Price</label>
+                  <p className="text-lg font-bold text-green-600">₹{selectedProduct.price}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Quantity</label>
+                  <p className="text-lg">{selectedProduct.quantity}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Product Code</label>
+                  <p className="text-lg font-mono">{selectedProduct.productCode}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Stock</label>
+                  <p className="text-lg">{selectedProduct.productCount}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Status</label>
+                  <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                    selectedProduct.productStatus === 'AVAILABLE' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                  }`}>
+                    {selectedProduct.productStatus}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 30 }}
@@ -204,7 +386,7 @@ export default function Orders() {
         <h1 className="text-2xl font-bold">Orders Management</h1>
         <div className="flex gap-2">
           <button
-            onClick={fetchOrders}
+            onClick={() => fetchOrders(pagination.page, pagination.limit)}
             disabled={loading}
             className="bg-gray-600 text-white px-4 py-2 rounded-lg font-semibold shadow hover:scale-105 transition-transform duration-200 text-sm disabled:opacity-50"
           >
@@ -217,19 +399,19 @@ export default function Orders() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div className="bg-white dark:bg-slate-800 rounded-xl shadow p-4">
           <div className="text-sm text-slate-500 dark:text-slate-400">Total Orders</div>
-          <div className="text-2xl font-bold text-blue-600">{summary.totalOrders}</div>
+          <div className="text-2xl font-bold text-blue-600">{pagination.total}</div>
         </div>
         <div className="bg-white dark:bg-slate-800 rounded-xl shadow p-4">
           <div className="text-sm text-slate-500 dark:text-slate-400">Total Revenue</div>
-          <div className="text-2xl font-bold text-green-600">₹{summary.totalRevenue.toLocaleString()}</div>
+          <div className="text-2xl font-bold text-green-600">₹{orders.reduce((sum, order) => sum + order.totalAmount, 0).toLocaleString()}</div>
         </div>
         <div className="bg-white dark:bg-slate-800 rounded-xl shadow p-4">
           <div className="text-sm text-slate-500 dark:text-slate-400">Pending Orders</div>
-          <div className="text-2xl font-bold text-yellow-600">{summary.pendingOrders}</div>
+          <div className="text-2xl font-bold text-yellow-600">{orders.filter(o => o.status === 'Pending').length}</div>
         </div>
         <div className="bg-white dark:bg-slate-800 rounded-xl shadow p-4">
           <div className="text-sm text-slate-500 dark:text-slate-400">Completed Orders</div>
-          <div className="text-2xl font-bold text-purple-600">{summary.completedOrders}</div>
+          <div className="text-2xl font-bold text-purple-600">{orders.filter(o => o.status === 'confirmed' || o.status === 'Delivered').length}</div>
         </div>
       </div>
 
@@ -296,10 +478,10 @@ export default function Orders() {
             <tr className="bg-gray-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-sm">
               <th className="py-3 px-4 text-left">Order #</th>
               <th className="py-3 px-4 text-left">Customer</th>
-              <th className="py-3 px-4 text-center">Products</th>
+              <th className="py-3 px-4 text-left">Products</th>
+              <th className="py-3 px-4 text-center">Quantity</th>
               <th className="py-3 px-4 text-center">Total ₹</th>
               <th className="py-3 px-4 text-center">Status</th>
-              <th className="py-3 px-4 text-center">Type</th>
               <th className="py-3 px-4 text-center">Date</th>
               <th className="py-3 px-4 text-center">Actions</th>
             </tr>
@@ -320,36 +502,25 @@ export default function Orders() {
                 <tr key={order.id} className="border-b border-gray-100 dark:border-slate-700 hover:bg-purple-50 dark:hover:bg-slate-700 transition">
                   <td className="py-3 px-4 whitespace-nowrap font-medium">{order.orderNumber}</td>
                   <td className="py-3 px-4 whitespace-nowrap">{order.customer}</td>
-                  <td className="py-3 px-4 text-center">{order.products.length} items</td>
+                  <td className="py-3 px-4 whitespace-nowrap">{order.products[0]?.name || 'N/A'}</td>
+                  <td className="py-3 px-4 text-center">{order.products[0]?.quantity || 0}</td>
                   <td className="py-3 px-4 text-center font-bold">₹{order.totalAmount.toLocaleString()}</td>
                   <td className="py-3 px-4 text-center">
                     <span className={`px-2 py-1 rounded-full text-xs font-semibold ${getStatusColor(order.status)}`}>
                       {order.status}
                     </span>
                   </td>
-                  <td className="py-3 px-4 text-center">
-                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${getTypeColor(order.type)}`}>
-                      {order.type}
-                    </span>
-                  </td>
                   <td className="py-3 px-4 text-center">{order.orderDate}</td>
                   <td className="py-3 px-4 text-center">
                     <div className="inline-flex items-center gap-2">
-                      <button 
-                        onClick={() => handleViewOrder(order)}
-                        className="px-3 py-1 text-xs font-medium text-blue-600 bg-transparent hover:bg-blue-50 dark:hover:bg-slate-800 focus:z-10 focus:outline-none transition rounded"
-                      >
-                        View
-                      </button>
-                      <select
-                        value={order.status}
-                        onChange={(e) => handleUpdateStatus(order.id, e.target.value)}
-                        className="px-2 py-1 text-xs border border-gray-300 rounded bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
-                      >
-                        {orderStatuses.filter(status => status !== 'All').map((status) => (
-                          <option key={status} value={status}>{status}</option>
-                        ))}
-                      </select>
+                      <ActionMenu
+                        onView={() => handleViewOrder(order)}
+                        onViewUser={() => handleViewUser(order)}
+                        onViewProduct={() => handleViewProduct(order)}
+                        onUpdateStatus={(newStatus) => handleUpdateStatus(order.id, newStatus)}
+                        order={order}
+                        orderStatuses={orderStatuses.filter(status => status !== 'All')}
+                      />
                     </div>
                   </td>
                 </tr>
@@ -357,6 +528,25 @@ export default function Orders() {
             )}
           </tbody>
         </table>
+      </div>
+
+      {/* Pagination */}
+      <div className="flex justify-between items-center my-4">
+        <button 
+          onClick={handlePrevPage} 
+          disabled={!pagination.hasPrev} 
+          className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
+        >
+          Previous
+        </button>
+        <span>Page {pagination.page} of {pagination.totalPages} (Total: {pagination.total})</span>
+        <button 
+          onClick={handleNextPage} 
+          disabled={!pagination.hasNext} 
+          className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
+        >
+          Next
+        </button>
       </div>
 
       {/* Order Details Modal */}
@@ -411,8 +601,8 @@ export default function Orders() {
                   <div className="mt-2 space-y-2">
                     {selectedOrder.products.map((product, index) => (
                       <div key={index} className="flex justify-between items-center p-2 bg-gray-50 dark:bg-slate-700 rounded">
-                        <span>{product.name || product.productName || 'Product'}</span>
-                        <span className="font-semibold">₹{product.price || 0}</span>
+                        <span>{product.name}</span>
+                        <span className="font-semibold">₹{product.price}</span>
                       </div>
                     ))}
                   </div>
@@ -446,6 +636,12 @@ export default function Orders() {
           </div>
         </div>
       )}
+
+      {/* User Details Modal */}
+      {showUserModal && <UserModal />}
+
+      {/* Product Details Modal */}
+      {showProductModal && <ProductModal />}
     </motion.div>
   );
 } 
