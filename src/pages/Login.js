@@ -19,13 +19,18 @@ export default function Login() {
         body: JSON.stringify({ username, password }),
       });
       const data = await res.json();
+      console.log('Login response:', data); // Debug log
+      
       if (!res.ok || !data.token) {
         setError(data.message || "Invalid credentials");
         return;
       }
+      
       localStorage.setItem("adminToken", data.token);
+      console.log('Token stored:', data.token); // Debug log
       navigate("/");
     } catch (err) {
+      console.error('Login error:', err); // Debug log
       setError("Server error. Please try again.");
     }
   };

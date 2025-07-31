@@ -86,6 +86,12 @@ export const ADMIN_ENDPOINTS = {
     UPDATE: (id) => `${BASE_URL}/admin/milestones/${id}`,
     DELETE: (id) => `${BASE_URL}/admin/milestones/${id}`,
   },
+  REWARD_TARGETS: {
+    LIST: `${BASE_URL}/api/admin/getAll-reward-targets`,
+    CREATE: `${BASE_URL}/api/admin/reward-target`,
+    UPDATE: (id) => `${BASE_URL}/api/admin/reward-target/${id}`,
+    DELETE: (id) => `${BASE_URL}/api/admin/reward-target/${id}`,
+  },
 };
 
 export const getAdminHeaders = () => {
