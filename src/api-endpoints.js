@@ -60,6 +60,15 @@ export const ADMIN_ENDPOINTS = {
     UPDATE: (id) => `${BASE_URL}/admin/payouts/${id}`,
     STATS: `${BASE_URL}/admin/payouts/stats/summary`,
   },
+  BANK_DETAILS: {
+    GET: (userId) => `${BASE_URL}/api/bankDetails/getBankDetails/${userId}`,
+    CREATE: (userId) => `${BASE_URL}/api/bankDetails/createBankDetails/${userId}`,
+    UPDATE: (userId) => `${BASE_URL}/api/bankDetails/updateBankDetails/${userId}`,
+    CREATE_OR_UPDATE: (userId) => `${BASE_URL}/api/bankDetails/createOrUpdateBankDetails/${userId}`,
+    DELETE: (userId) => `${BASE_URL}/api/bankDetails/deleteBankDetails/${userId}`,
+    CHECK: (userId) => `${BASE_URL}/api/bankDetails/checkBankDetails/${userId}`,
+    VALIDATE: `${BASE_URL}/api/bankDetails/validateBankDetails`,
+  },
   PAYMENTS: {
     LIST: `${BASE_URL}/admin/payments`,
     DETAIL: (id) => `${BASE_URL}/admin/payments/${id}`,
