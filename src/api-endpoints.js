@@ -68,6 +68,10 @@ export const ADMIN_ENDPOINTS = {
     DELETE: (userId) => `${BASE_URL}/api/bankDetails/deleteBankDetails/${userId}`,
     CHECK: (userId) => `${BASE_URL}/api/bankDetails/checkBankDetails/${userId}`,
     VALIDATE: `${BASE_URL}/api/bankDetails/validateBankDetails`,
+    GET_ALL_WITH_USERS: `${BASE_URL}/api/bankDetails/getAllBankDetailsWithUsers`,
+    UPDATE_REDEEM_STATUS: (userId) => `${BASE_URL}/api/bankDetails/updateRedeemStatus/${userId}`,
+    UPDATE_REDEEM_AMOUNT: (userId) => `${BASE_URL}/api/bankDetails/updateRedeemAmount/${userId}`,
+    GET_REDEEM_HISTORY: (userId) => `${BASE_URL}/api/bankDetails/redeemHistory/${userId}`,
   },
   PAYMENTS: {
     LIST: `${BASE_URL}/admin/payments`,
