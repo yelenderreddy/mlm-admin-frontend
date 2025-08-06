@@ -263,37 +263,183 @@
 //     </div>
 //   );
 // } 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 
 export default function Settings() {
   const [tab, setTab] = useState("privacy");
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
 
   const [privacyPolicy, setPrivacyPolicy] = useState("");
+  const [privacyTitle, setPrivacyTitle] = useState("Privacy Policy");
   const [terms, setTerms] = useState("");
+  const [termsTitle, setTermsTitle] = useState("Terms & Conditions");
 
   const [faqQuestion, setFaqQuestion] = useState("");
   const [faqAnswer, setFaqAnswer] = useState("");
   const [faqs, setFaqs] = useState([]);
 
-  const handleAddFaq = () => {
-    if (faqQuestion && faqAnswer) {
-      setFaqs([...faqs, { question: faqQuestion, answer: faqAnswer }]);
-      setFaqQuestion("");
-      setFaqAnswer("");
+  // API base URL
+  const API_BASE_URL = "http://localhost:3000";
+
+  // Helper function to show messages
+  const showMessage = (msg, isError = false) => {
+    setMessage(msg);
+    setTimeout(() => setMessage(""), 3000);
+  };
+
+  // Fetch existing data
+  useEffect(() => {
+    fetchExistingData();
+  }, []);
+
+  const fetchExistingData = async () => {
+    try {
+      // Fetch active privacy policy
+      const privacyResponse = await fetch(`${API_BASE_URL}/privacy/active`);
+      if (privacyResponse.ok) {
+        const privacyData = await privacyResponse.json();
+        if (privacyData.data) {
+          setPrivacyPolicy(privacyData.data.content);
+          setPrivacyTitle(privacyData.data.title);
+        }
+      }
+
+      // Fetch active terms
+      const termsResponse = await fetch(`${API_BASE_URL}/terms/active`);
+      if (termsResponse.ok) {
+        const termsData = await termsResponse.json();
+        if (termsData.data) {
+          setTerms(termsData.data.content);
+          setTermsTitle(termsData.data.title);
+        }
+      }
+
+      // Fetch FAQs
+      const faqResponse = await fetch(`${API_BASE_URL}/faq/getAllFaqs`);
+      if (faqResponse.ok) {
+        const faqData = await faqResponse.json();
+        if (faqData.data) {
+          setFaqs(faqData.data);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching data:", error);
     }
   };
 
-  const handleSubmitPrivacy = () => {
-    alert("Privacy Policy submitted successfully.");
+  const handleAddFaq = async () => {
+    if (faqQuestion && faqAnswer) {
+      try {
+        const response = await fetch(`${API_BASE_URL}/faq/createFaq`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            question: faqQuestion,
+            answer: faqAnswer,
+            category: "general"
+          }),
+        });
+
+        if (response.ok) {
+          showMessage("FAQ added successfully!");
+          setFaqQuestion("");
+          setFaqAnswer("");
+          fetchExistingData(); // Refresh the list
+        } else {
+          showMessage("Failed to add FAQ", true);
+        }
+      } catch (error) {
+        showMessage("Error adding FAQ", true);
+      }
+    }
   };
 
-  const handleSubmitTerms = () => {
-    alert("Terms & Conditions submitted successfully.");
+  const handleSubmitPrivacy = async () => {
+    if (!privacyPolicy.trim()) {
+      showMessage("Please enter privacy policy content", true);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/privacy`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          title: privacyTitle,
+          content: privacyPolicy,
+          status: "active"
+        }),
+      });
+
+      if (response.ok) {
+        showMessage("Privacy Policy submitted successfully!");
+        setPrivacyPolicy("");
+        setPrivacyTitle("Privacy Policy");
+      } else {
+        showMessage("Failed to submit privacy policy", true);
+      }
+    } catch (error) {
+      showMessage("Error submitting privacy policy", true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmitTerms = async () => {
+    if (!terms.trim()) {
+      showMessage("Please enter terms and conditions content", true);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/terms`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          title: termsTitle,
+          content: terms,
+          status: "active"
+        }),
+      });
+
+      if (response.ok) {
+        showMessage("Terms & Conditions submitted successfully!");
+        setTerms("");
+        setTermsTitle("Terms & Conditions");
+      } else {
+        showMessage("Failed to submit terms and conditions", true);
+      }
+    } catch (error) {
+      showMessage("Error submitting terms and conditions", true);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <div className="p-4 sm:p-8 max-w-4xl mx-auto">
       <h1 className="text-2xl font-bold mb-6">Settings</h1>
+      
+      {/* Message Display */}
+      {message && (
+        <div className={`mb-4 p-4 rounded-lg ${
+          message.includes("Error") || message.includes("Failed") 
+            ? "bg-red-100 text-red-700 border border-red-300" 
+            : "bg-green-100 text-green-700 border border-green-300"
+        }`}>
+          {message}
+        </div>
+      )}
+
       <div className="flex gap-4 mb-6">
         <button onClick={() => setTab("privacy")} className={`px-4 py-2 rounded ${tab === "privacy" ? "bg-purple-600 text-white" : "bg-gray-200"}`}>Privacy Policy</button>
         <button onClick={() => setTab("terms")} className={`px-4 py-2 rounded ${tab === "terms" ? "bg-purple-600 text-white" : "bg-gray-200"}`}>Terms & Conditions</button>
@@ -303,17 +449,33 @@ export default function Settings() {
       {tab === "privacy" && (
         <div>
           <h2 className="text-xl font-semibold mb-4">Privacy Policy</h2>
-          <textarea
-            className="w-full h-60 p-4 border rounded-md"
-            value={privacyPolicy}
-            onChange={(e) => setPrivacyPolicy(e.target.value)}
-            placeholder="Write your privacy policy here..."
-          />
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Title</label>
+            <input
+              type="text"
+              className="w-full p-3 border rounded-md"
+              value={privacyTitle}
+              onChange={(e) => setPrivacyTitle(e.target.value)}
+              placeholder="Enter privacy policy title..."
+            />
+          </div>
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Content</label>
+            <textarea
+              className="w-full h-60 p-4 border rounded-md"
+              value={privacyPolicy}
+              onChange={(e) => setPrivacyPolicy(e.target.value)}
+              placeholder="Write your privacy policy here..."
+            />
+          </div>
           <button
             onClick={handleSubmitPrivacy}
-            className="mt-4 px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700"
+            disabled={loading}
+            className={`mt-4 px-4 py-2 text-white rounded-md ${
+              loading ? "bg-gray-400 cursor-not-allowed" : "bg-purple-600 hover:bg-purple-700"
+            }`}
           >
-            Submit Privacy Policy
+            {loading ? "Submitting..." : "Submit Privacy Policy"}
           </button>
         </div>
       )}
@@ -321,17 +483,33 @@ export default function Settings() {
       {tab === "terms" && (
         <div>
           <h2 className="text-xl font-semibold mb-4">Terms & Conditions</h2>
-          <textarea
-            className="w-full h-60 p-4 border rounded-md"
-            value={terms}
-            onChange={(e) => setTerms(e.target.value)}
-            placeholder="Write your terms and conditions here..."
-          />
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Title</label>
+            <input
+              type="text"
+              className="w-full p-3 border rounded-md"
+              value={termsTitle}
+              onChange={(e) => setTermsTitle(e.target.value)}
+              placeholder="Enter terms and conditions title..."
+            />
+          </div>
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Content</label>
+            <textarea
+              className="w-full h-60 p-4 border rounded-md"
+              value={terms}
+              onChange={(e) => setTerms(e.target.value)}
+              placeholder="Write your terms and conditions here..."
+            />
+          </div>
           <button
             onClick={handleSubmitTerms}
-            className="mt-4 px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700"
+            disabled={loading}
+            className={`mt-4 px-4 py-2 text-white rounded-md ${
+              loading ? "bg-gray-400 cursor-not-allowed" : "bg-purple-600 hover:bg-purple-700"
+            }`}
           >
-            Submit Terms & Conditions
+            {loading ? "Submitting..." : "Submit Terms & Conditions"}
           </button>
         </div>
       )}
@@ -340,34 +518,53 @@ export default function Settings() {
         <div>
           <h2 className="text-xl font-semibold mb-4">FAQs</h2>
           <div className="space-y-4">
-            <input
-              type="text"
-              placeholder="Enter your question"
-              value={faqQuestion}
-              onChange={(e) => setFaqQuestion(e.target.value)}
-              className="w-full px-4 py-2 border rounded-md"
-            />
-            <textarea
-              placeholder="Enter the answer"
-              value={faqAnswer}
-              onChange={(e) => setFaqAnswer(e.target.value)}
-              className="w-full px-4 py-2 border rounded-md"
-            />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Question</label>
+              <input
+                type="text"
+                placeholder="Enter your question"
+                value={faqQuestion}
+                onChange={(e) => setFaqQuestion(e.target.value)}
+                className="w-full px-4 py-2 border rounded-md"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Answer</label>
+              <textarea
+                placeholder="Enter the answer"
+                value={faqAnswer}
+                onChange={(e) => setFaqAnswer(e.target.value)}
+                className="w-full px-4 py-2 border rounded-md h-32"
+              />
+            </div>
             <button
               onClick={handleAddFaq}
-              className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700"
+              disabled={loading}
+              className={`px-4 py-2 text-white rounded-md ${
+                loading ? "bg-gray-400 cursor-not-allowed" : "bg-purple-600 hover:bg-purple-700"
+              }`}
             >
-              Submit FAQ
+              {loading ? "Adding..." : "Submit FAQ"}
             </button>
           </div>
 
           <div className="mt-8 space-y-4">
-            {faqs.map((faq, index) => (
-              <div key={index} className="border p-4 rounded-md">
-                <h4 className="font-semibold">Q: {faq.question}</h4>
-                <p className="text-gray-700 mt-1">A: {faq.answer}</p>
-              </div>
-            ))}
+            <h3 className="text-lg font-semibold">Existing FAQs</h3>
+            {faqs.length === 0 ? (
+              <p className="text-gray-500">No FAQs found. Add your first FAQ above.</p>
+            ) : (
+              faqs.map((faq, index) => (
+                <div key={index} className="border p-4 rounded-md bg-gray-50">
+                  <h4 className="font-semibold text-gray-900">Q: {faq.question}</h4>
+                  <p className="text-gray-700 mt-2">A: {faq.answer}</p>
+                  {faq.category && (
+                    <span className="inline-block mt-2 px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded">
+                      {faq.category}
+                    </span>
+                  )}
+                </div>
+              ))
+            )}
           </div>
         </div>
       )}
