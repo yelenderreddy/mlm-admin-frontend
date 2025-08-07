@@ -288,6 +288,15 @@ export default function Settings() {
     setTimeout(() => setMessage(""), 3000);
   };
 
+  // Helper function to get auth headers
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem('adminToken');
+    return {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    };
+  };
+
   // Fetch existing data
   useEffect(() => {
     fetchExistingData();
@@ -296,7 +305,9 @@ export default function Settings() {
   const fetchExistingData = async () => {
     try {
       // Fetch active privacy policy
-      const privacyResponse = await fetch(`${API_BASE_URL}/privacy/active`);
+      const privacyResponse = await fetch(`${API_BASE_URL}/privacy/active`, {
+        headers: getAuthHeaders()
+      });
       if (privacyResponse.ok) {
         const privacyData = await privacyResponse.json();
         if (privacyData.data) {
@@ -306,7 +317,9 @@ export default function Settings() {
       }
 
       // Fetch active terms
-      const termsResponse = await fetch(`${API_BASE_URL}/terms/active`);
+      const termsResponse = await fetch(`${API_BASE_URL}/terms/active`, {
+        headers: getAuthHeaders()
+      });
       if (termsResponse.ok) {
         const termsData = await termsResponse.json();
         if (termsData.data) {
@@ -316,7 +329,9 @@ export default function Settings() {
       }
 
       // Fetch FAQs
-      const faqResponse = await fetch(`${API_BASE_URL}/faq/getAllFaqs`);
+      const faqResponse = await fetch(`${API_BASE_URL}/faq/getAllFaqs`, {
+        headers: getAuthHeaders()
+      });
       if (faqResponse.ok) {
         const faqData = await faqResponse.json();
         if (faqData.data) {
@@ -333,9 +348,7 @@ export default function Settings() {
       try {
         const response = await fetch(`${API_BASE_URL}/faq/createFaq`, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: getAuthHeaders(),
           body: JSON.stringify({
             question: faqQuestion,
             answer: faqAnswer,
@@ -367,9 +380,7 @@ export default function Settings() {
     try {
       const response = await fetch(`${API_BASE_URL}/privacy`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           title: privacyTitle,
           content: privacyPolicy,
@@ -401,9 +412,7 @@ export default function Settings() {
     try {
       const response = await fetch(`${API_BASE_URL}/terms`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           title: termsTitle,
           content: terms,
