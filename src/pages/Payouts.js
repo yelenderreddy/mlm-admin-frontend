@@ -11,7 +11,7 @@ import {
 import { ADMIN_ENDPOINTS, getAdminHeaders } from '../api-endpoints';
 import { logDebug, logError } from '../config';
 
-export default function Payouts() {
+export default function Payouts({ setPayoutNotificationCount }) {
   const [redeemRequests, setRedeemRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -42,8 +42,16 @@ export default function Payouts() {
         // Filter only records with redeem amounts > 0
         const redeemData = data.data.filter(item => item.redeemAmount > 0);
         setRedeemRequests(redeemData);
+        // Count pending payouts (not deposited)
+        if (typeof setPayoutNotificationCount === 'function') {
+          const pendingCount = redeemData.filter(item => item.redeemStatus !== 'deposited').length;
+          setPayoutNotificationCount(pendingCount);
+        }
       } else {
         setRedeemRequests([]);
+        if (typeof setPayoutNotificationCount === 'function') {
+          setPayoutNotificationCount(0);
+        }
       }
     } catch (err) {
       logError('Failed to fetch redeem requests', err);
@@ -75,11 +83,17 @@ export default function Payouts() {
       }
 
       // Update local state
-      setRedeemRequests(prevRequests => 
-        prevRequests.map(request => 
+      setRedeemRequests(prevRequests => {
+        const updated = prevRequests.map(request => 
           request.user.id === userId ? { ...request, redeemStatus: status } : request
-        )
-      );
+        );
+        // Update notification count after status change
+        if (typeof setPayoutNotificationCount === 'function') {
+          const pendingCount = updated.filter(item => item.redeemStatus !== 'deposited').length;
+          setPayoutNotificationCount(pendingCount);
+        }
+        return updated;
+      });
 
       setShowStatusUpdateModal(false);
       setSelectedRedeemRequest(null);

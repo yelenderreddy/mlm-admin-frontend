@@ -1,3 +1,18 @@
+// Sidebar navigation links for admin dashboard
+import { Bars3Icon, UsersIcon, ShoppingBagIcon, CreditCardIcon, CurrencyDollarIcon, Cog6ToothIcon, GiftIcon, ChartBarIcon, UserGroupIcon, ArrowTrendingUpIcon } from '@heroicons/react/24/outline';
+
+export const sidebarLinks = [
+  { name: 'Dashboard', icon: Bars3Icon },
+  { name: 'Members', icon: UsersIcon },
+  { name: 'Products', icon: ShoppingBagIcon },
+  { name: 'Orders', icon: CreditCardIcon },
+  { name: 'Payouts', icon: CurrencyDollarIcon },
+  { name: 'Payments', icon: CreditCardIcon },
+  { name: 'Tree View', icon: UserGroupIcon },
+  { name: 'Income Reports', icon: ArrowTrendingUpIcon },
+  { name: 'Gift Management', icon: GiftIcon },
+  { name: 'Settings', icon: Cog6ToothIcon },
+];
 export const BASE_URL = "http://localhost:3000";
 
 export const config = {
