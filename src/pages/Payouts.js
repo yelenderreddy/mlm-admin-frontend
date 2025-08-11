@@ -6,7 +6,8 @@ import {
   EyeIcon,
   ArrowPathIcon,
   ClockIcon,
-  EllipsisVerticalIcon
+  EllipsisVerticalIcon,
+  CreditCardIcon
 } from '@heroicons/react/24/outline';
 import { ADMIN_ENDPOINTS, getAdminHeaders } from '../api-endpoints';
 import { logDebug, logError } from '../config';
@@ -18,7 +19,9 @@ export default function Payouts({ setPayoutNotificationCount }) {
   const [selectedRedeemRequest, setSelectedRedeemRequest] = useState(null);
   const [showRedeemDetailModal, setShowRedeemDetailModal] = useState(false);
   const [showStatusUpdateModal, setShowStatusUpdateModal] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [newStatus, setNewStatus] = useState('processing');
+  const [paymentLoading, setPaymentLoading] = useState(false);
 
 
 
@@ -115,6 +118,92 @@ export default function Payouts({ setPayoutNotificationCount }) {
     setSelectedRedeemRequest(redeemRequest);
     setNewStatus(redeemRequest.redeemStatus);
     setShowStatusUpdateModal(true);
+  };
+
+  // Handle payment modal
+  const handlePayment = (redeemRequest) => {
+    setSelectedRedeemRequest(redeemRequest);
+    setShowPaymentModal(true);
+  };
+
+  // Handle Razorpay payment
+  const handleRazorpayPayment = async () => {
+    if (!selectedRedeemRequest) return;
+    
+    try {
+      setPaymentLoading(true);
+      
+      // Create Razorpay order
+      const orderResponse = await fetch(ADMIN_ENDPOINTS.PAYMENTS.RAZORPAY.CREATE_ORDER, {
+        method: 'POST',
+        headers: {
+          ...getAdminHeaders(),
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          user_id: selectedRedeemRequest.user.id,
+          amount: selectedRedeemRequest.redeemAmount,
+          receipt: `payout_${selectedRedeemRequest.id}_${Date.now()}`,
+          notes: {
+            type: 'admin_payout',
+            redeem_request_id: selectedRedeemRequest.id.toString(),
+            user_name: selectedRedeemRequest.user.name,
+            purpose: 'Redeem payout'
+          }
+        })
+      });
+
+      if (!orderResponse.ok) {
+        throw new Error(`Failed to create payment order: ${orderResponse.status}`);
+      }
+
+      const orderData = await orderResponse.json();
+      
+      if (orderData.statusCode !== 201) {
+        throw new Error(orderData.message || 'Failed to create payment order');
+      }
+
+      const order = orderData.data;
+      
+      // Initialize Razorpay payment
+      const options = {
+        key: process.env.REACT_APP_RAZORPAY_KEY_ID || 'rzp_test_51HqjWmKgnvOcbXg', // Use your Razorpay key
+        amount: order.amount,
+        currency: order.currency || 'INR',
+        name: 'CamelQ Software Solutions',
+        description: `Payout for ${selectedRedeemRequest.user.name}`,
+        order_id: order.id,
+        handler: async function (response) {
+          try {
+            // Payment successful - update redeem status to deposited
+            await handleUpdateRedeemStatus(selectedRedeemRequest.user.id, 'deposited');
+            setShowPaymentModal(false);
+            setSelectedRedeemRequest(null);
+            logDebug('Payment successful', response);
+          } catch (error) {
+            logError('Failed to update redeem status after payment', error);
+            alert('Payment successful but failed to update status. Please update manually.');
+          }
+        },
+        prefill: {
+          name: selectedRedeemRequest.user.name,
+          email: selectedRedeemRequest.user.email,
+          contact: selectedRedeemRequest.user.mobileNumber
+        },
+        theme: {
+          color: '#7c3aed'
+        }
+      };
+
+      const razorpay = new window.Razorpay(options);
+      razorpay.open();
+      
+    } catch (error) {
+      logError('Payment initialization failed', error);
+      alert('Failed to initialize payment. Please try again.');
+    } finally {
+      setPaymentLoading(false);
+    }
   };
 
 
@@ -228,6 +317,15 @@ export default function Payouts({ setPayoutNotificationCount }) {
                         >
                           <EllipsisVerticalIcon className="w-4 h-4" />
                         </button>
+                        {redeemRequest.redeemStatus !== 'deposited' && (
+                          <button
+                            onClick={() => handlePayment(redeemRequest)}
+                            className="text-purple-600 hover:text-purple-900 dark:text-purple-400 dark:hover:text-purple-300"
+                            title="Pay via Razorpay"
+                          >
+                            <CreditCardIcon className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -394,6 +492,75 @@ export default function Payouts({ setPayoutNotificationCount }) {
                 </button>
                 <button
                   onClick={() => setShowStatusUpdateModal(false)}
+                  className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-700 px-4 py-2 rounded-lg font-medium transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Payment Modal */}
+      {showPaymentModal && selectedRedeemRequest && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-slate-800 rounded-lg p-6 w-full max-w-md">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Process Payment</h3>
+              <button
+                onClick={() => setShowPaymentModal(false)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              >
+                <XCircleIcon className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">User</label>
+                <p className="text-sm text-gray-900 dark:text-white">{selectedRedeemRequest.user?.name || 'Unknown'}</p>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Amount to Pay</label>
+                <p className="text-lg font-bold text-green-600 dark:text-green-400">₹{selectedRedeemRequest.redeemAmount?.toLocaleString() || '0'}</p>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Payment Method</label>
+                <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                  <CreditCardIcon className="w-4 h-4" />
+                  Razorpay Payment Gateway
+                </div>
+              </div>
+              
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                <p className="text-sm text-blue-800 dark:text-blue-200">
+                  <strong>Note:</strong> This will open Razorpay payment gateway. After successful payment, the redeem status will automatically update to "deposited".
+                </p>
+              </div>
+              
+              <div className="flex gap-3 pt-4">
+                <button
+                  onClick={handleRazorpayPayment}
+                  disabled={paymentLoading}
+                  className="flex-1 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-400 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+                >
+                  {paymentLoading ? (
+                    <>
+                      <ArrowPathIcon className="w-4 h-4 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <CreditCardIcon className="w-4 h-4" />
+                      Pay Now
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => setShowPaymentModal(false)}
                   className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-700 px-4 py-2 rounded-lg font-medium transition-colors"
                 >
                   Cancel

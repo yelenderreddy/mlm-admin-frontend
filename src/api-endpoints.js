@@ -80,6 +80,9 @@ export const ADMIN_ENDPOINTS = {
     UPDATE: (id) => `${BASE_URL}/admin/payments/${id}`,
     REFUND: (id) => `${BASE_URL}/admin/payments/${id}/refund`,
     STATS: `${BASE_URL}/admin/payments/stats/summary`,
+    RAZORPAY: {
+      CREATE_ORDER: `${BASE_URL}/api/payments/create-order`,
+    },
   },
   GIFTS: {
     LIST: `${BASE_URL}/admin/gifts`,
