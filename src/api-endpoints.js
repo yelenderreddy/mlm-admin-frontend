@@ -1,7 +1,7 @@
 import { BASE_URL } from "./config";
 
 export const ADMIN_ENDPOINTS = {
-  DASHBOARD: `${BASE_URL}/admin/dashboard`,
+  DASHBOARD: `${BASE_URL}/api/admin/dashboard/stats`,
   USERS: {
     LIST: `${BASE_URL}/admin/users`,
     DETAIL: (id) => `${BASE_URL}/admin/users/${id}`,

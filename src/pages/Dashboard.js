@@ -171,33 +171,24 @@ function Dashboard() {
       setLoading(true);
       setError(null);
       
-      const [
-        dashboardResponse,
-        membersResponse,
-        productsResponse,
-        ordersResponse
-      ] = await Promise.all([
-        fetch(ADMIN_ENDPOINTS.DASHBOARD, { headers: getAdminHeaders() }),
-        fetch(ADMIN_ENDPOINTS.USERS.LIST, { headers: getAdminHeaders() }),
-        fetch(ADMIN_ENDPOINTS.PRODUCTS.LIST, { headers: getAdminHeaders() }),
-        fetch(ADMIN_ENDPOINTS.ORDERS.LIST, { headers: getAdminHeaders() })
-      ]);
+      // Fetch dashboard stats from the new admin endpoint
+      const dashboardResponse = await fetch(ADMIN_ENDPOINTS.DASHBOARD, { 
+        headers: getAdminHeaders() 
+      });
 
-      // Process responses
-      const dashboardData = dashboardResponse.ok ? await dashboardResponse.json() : {};
-      const usersData = membersResponse.ok ? await membersResponse.json() : [];
-      const giftsData = productsResponse.ok ? await productsResponse.json() : [];
-      const payoutsData = ordersResponse.ok ? await ordersResponse.json() : [];
+      if (!dashboardResponse.ok) {
+        throw new Error(`Dashboard API error: ${dashboardResponse.status}`);
+      }
 
-      // Combine all data
+      const dashboardData = await dashboardResponse.json();
+      
+      // Extract data from the response
       const combinedData = {
-        ...dashboardData,
-        totalMembers: usersData.length || 0,
-        pendingGiftApprovals: giftsData.filter(gift => gift.status === 'Pending').length || 0,
-        pendingPayouts: payoutsData.filter(payout => payout.status === 'Pending').length || 0
+        ...dashboardData.data, // The actual stats are in the data property
+        // Additional data can be added here if needed
       };
 
-      logDebug('All dashboard data received', combinedData);
+      logDebug('Dashboard data received', combinedData);
       
       setDashboardStats(combinedData);
 
@@ -218,43 +209,43 @@ function Dashboard() {
   const summaryCards = [
     { 
       label: "Total Members", 
-      value: dashboardStats?.totalMembers?.toLocaleString() || "0", 
+      value: dashboardStats?.totalUsers?.toLocaleString() || "0", 
       icon: "👥", 
       color: "bg-blue-100 text-blue-600" 
     },
     { 
       label: "Daily Joins", 
-      value: dashboardStats?.dailyJoins || "0", 
+      value: dashboardStats?.todayJoins || "0", 
       icon: "📈", 
       color: "bg-green-100 text-green-600" 
+    },
+    { 
+      label: "Weekly Joins", 
+      value: dashboardStats?.weeklyJoins || "0", 
+      icon: "📊", 
+      color: "bg-indigo-100 text-indigo-600" 
+    },
+    { 
+      label: "Monthly Joins", 
+      value: dashboardStats?.monthlyJoins || "0", 
+      icon: "📅", 
+      color: "bg-purple-100 text-purple-600" 
     },
     { 
       label: "Gift Pool Balance", 
       value: `₹${(dashboardStats?.giftPoolBalance || 0).toLocaleString()}`, 
       icon: "🎁", 
-      color: "bg-purple-100 text-purple-600" 
-    },
-    { 
-      label: "Company Profit", 
-      value: `₹${(dashboardStats?.companyProfit || 0).toLocaleString()}`, 
-      icon: "💰", 
-      color: "bg-yellow-100 text-yellow-600" 
-    },
-    { 
-      label: "Pending Gift Approvals", 
-      value: dashboardStats?.pendingGiftApprovals || "0", 
-      icon: "📋", 
-      color: "bg-orange-100 text-orange-600" 
+      color: "bg-pink-100 text-pink-600" 
     },
     { 
       label: "Top Referrer Today", 
       value: dashboardStats?.topReferrerToday || "None", 
       icon: "🏆", 
-      color: "bg-pink-100 text-pink-600" 
+      color: "bg-yellow-100 text-yellow-600" 
     },
   ];
 
-  // Prepare chart data (fallback to dummy data if API doesn't provide)
+  // Prepare chart data (use real data from API, fallback to dummy data)
   const dailyJoinsData = dashboardStats?.dailyJoinsData || [
     { date: "Mon", joins: 60 },
     { date: "Tue", joins: 70 },
