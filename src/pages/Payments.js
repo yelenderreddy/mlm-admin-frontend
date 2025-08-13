@@ -38,17 +38,24 @@ export default function Payments() {
   });
   const [selectedPayment, setSelectedPayment] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 10,
+    total: 0,
+    totalPages: 1,
+    hasNext: false,
+    hasPrev: false,
+  });
 
-  // Fetch payments data
-  const fetchPayments = useCallback(async () => {
+  // Fetch payments data from new API
+  const fetchPayments = useCallback(async (page = 1, limit = 10) => {
     try {
       setLoading(true);
       setError(null);
       
-      logDebug('Fetching payments data');
+      logDebug('Fetching payments data from new API');
       
-      // For now, we'll use orders data as payments since there's no dedicated payments endpoint
-      const response = await fetch(ADMIN_ENDPOINTS.ORDERS.LIST, {
+      const response = await fetch(`${ADMIN_ENDPOINTS.ORDERS.ORDER_DETAILS}?page=${page}&limit=${limit}`, {
         headers: getAdminHeaders()
       });
 
@@ -56,24 +63,52 @@ export default function Payments() {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const data = await response.json();
-      logDebug('Payments data received', data);
+      const responseData = await response.json();
+      logDebug('Payments data received', responseData);
       
-      // Transform orders data to payments format
-      const paymentsData = data.map(order => ({
-        id: order.id,
-        member: order.user?.name || 'Unknown User',
-        memberEmail: order.user?.email || 'N/A',
-        amount: order.total || 0,
-        method: order.paymentMethod || 'Cash',
-        status: order.paymentStatus || 'Pending',
-        orderId: order.id,
-        createdAt: order.createdAt,
-        updatedAt: order.updatedAt,
-        items: order.items || []
-      }));
+      if (responseData.data && responseData.data.orders) {
+        const transformedPayments = responseData.data.orders.map(order => ({
+          id: order.id,
+          member: order.userName || 'Unknown User',
+          memberId: order.userId,
+          memberEmail: order.userEmail,
+          memberMobile: order.userMobile,
+          memberAddress: order.userAddress,
+          memberGender: order.userGender,
+          memberReferralCode: order.userReferralCode,
+          amount: (order.productPrice || 0) * order.quantity,
+          method: order.paymentMethod || 'Cash',
+          status: order.userPaymentStatus || 'Pending',
+          orderId: order.id,
+          orderStatus: order.status || 'Pending',
+          createdAt: order.orderedAt,
+          updatedAt: order.updatedAt,
+          products: [{
+            id: order.productId,
+            name: order.productName,
+            price: order.productPrice || 0,
+            quantity: order.quantity,
+            productCount: order.productCount,
+            productStatus: order.productStatus,
+            productCode: order.productCode,
+          }],
+          // Store original data for modals
+          originalData: order,
+        }));
 
-      setPayments(paymentsData);
+        setPayments(transformedPayments);
+        setPagination(responseData.data.pagination);
+      } else {
+        setPayments([]);
+        setPagination({
+          page: 1,
+          limit: 10,
+          total: 0,
+          totalPages: 1,
+          hasNext: false,
+          hasPrev: false,
+        });
+      }
     } catch (err) {
       logError('Failed to fetch payments', err);
       setError(err.message);
@@ -85,11 +120,11 @@ export default function Payments() {
 
   // Calculate summary statistics
   const calculateSummary = useCallback(() => {
-    const totalPayments = payments.length;
+    const totalPayments = pagination.total;
     const totalAmount = payments.reduce((sum, payment) => sum + (payment.amount || 0), 0);
-    const successfulPayments = payments.filter(p => p.status === 'Paid' || p.status === 'Completed').length;
-    const failedPayments = payments.filter(p => p.status === 'Failed' || p.status === 'Cancelled').length;
-    const pendingPayments = payments.filter(p => p.status === 'Pending').length;
+    const successfulPayments = payments.filter(p => p.status === 'PAID').length;
+    const failedPayments = payments.filter(p => p.status === 'FAILED' || p.status === 'CANCELLED').length;
+    const pendingPayments = payments.filter(p => p.status === 'PENDING').length;
     const averageAmount = totalPayments > 0 ? totalAmount / totalPayments : 0;
 
     setSummary({
@@ -100,16 +135,29 @@ export default function Payments() {
       pendingPayments,
       averageAmount
     });
-  }, [payments]);
+  }, [payments, pagination.total]);
 
-  // Load data on component mount
+  // Load data on component mount and when pagination changes
   useEffect(() => {
-    fetchPayments();
-  }, [fetchPayments]);
+    fetchPayments(pagination.page, pagination.limit);
+  }, [fetchPayments, pagination.page, pagination.limit]);
 
   useEffect(() => {
     calculateSummary();
   }, [calculateSummary]);
+
+  // Pagination controls
+  const handlePrevPage = () => {
+    if (pagination.hasPrev) {
+      setPagination(prev => ({ ...prev, page: prev.page - 1 }));
+    }
+  };
+
+  const handleNextPage = () => {
+    if (pagination.hasNext) {
+      setPagination(prev => ({ ...prev, page: prev.page + 1 }));
+    }
+  };
 
   // Handle payment refund
   const handleRefundPayment = async (paymentId) => {
@@ -144,29 +192,29 @@ export default function Payments() {
     if (filters.member && !payment.member.toLowerCase().includes(filters.member.toLowerCase())) return false;
     if (filters.minAmount && payment.amount < parseFloat(filters.minAmount)) return false;
     if (filters.maxAmount && payment.amount > parseFloat(filters.maxAmount)) return false;
+    if (filters.dateFrom && payment.createdAt && new Date(payment.createdAt) < new Date(filters.dateFrom)) return false;
+    if (filters.dateTo && payment.createdAt && new Date(payment.createdAt) > new Date(filters.dateTo)) return false;
     return true;
   });
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'Paid':
-      case 'Completed': return 'bg-green-100 text-green-700';
-      case 'Pending': return 'bg-yellow-100 text-yellow-700';
-      case 'Failed':
-      case 'Cancelled': return 'bg-red-100 text-red-700';
-      case 'Refunded': return 'bg-purple-100 text-purple-700';
-      default: return 'bg-gray-100 text-gray-700';
+      case 'PAID': return 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300';
+      case 'PENDING': return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300';
+      case 'FAILED':
+      case 'CANCELLED': return 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300';
+      case 'REFUNDED': return 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300';
+      default: return 'bg-gray-100 text-gray-700 dark:bg-gray-900 dark:text-gray-300';
     }
   };
 
   const getStatusIcon = (status) => {
     switch (status) {
-      case 'Paid':
-      case 'Completed': return <CheckCircleIcon className="w-4 h-4" />;
-      case 'Pending': return <ClockIcon className="w-4 h-4" />;
-      case 'Failed':
-      case 'Cancelled': return <XCircleIcon className="w-4 h-4" />;
-      case 'Refunded': return <ArrowTrendingUpIcon className="w-4 h-4" />;
+      case 'PAID': return <CheckCircleIcon className="w-4 h-4" />;
+      case 'PENDING': return <ClockIcon className="w-4 h-4" />;
+      case 'FAILED':
+      case 'CANCELLED': return <XCircleIcon className="w-4 h-4" />;
+      case 'REFUNDED': return <ArrowTrendingUpIcon className="w-4 h-4" />;
       default: return <ExclamationTriangleIcon className="w-4 h-4" />;
     }
   };
@@ -196,11 +244,12 @@ export default function Payments() {
           <p className="text-gray-600 dark:text-gray-400">Monitor and manage all payment transactions</p>
         </div>
         <button
-          onClick={fetchPayments}
-          className="bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-gray-200 dark:hover:bg-slate-600 transition-colors"
+          onClick={() => fetchPayments(pagination.page, pagination.limit)}
+          disabled={loading}
+          className="bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-gray-200 dark:hover:bg-slate-600 transition-colors disabled:opacity-50"
         >
           <ArrowPathIcon className="w-4 h-4" />
-          Refresh
+          {loading ? 'Loading...' : 'Refresh'}
         </button>
       </div>
 
@@ -210,7 +259,7 @@ export default function Payments() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Payments</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">{summary.totalPayments}</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{pagination.total}</p>
               <p className="text-sm text-gray-500 dark:text-gray-400">All transactions</p>
             </div>
             <div className="p-3 bg-blue-100 dark:bg-blue-900 rounded-full">
@@ -248,6 +297,19 @@ export default function Payments() {
         <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700">
           <div className="flex items-center justify-between">
             <div>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Pending</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{summary.pendingPayments}</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Awaiting</p>
+            </div>
+            <div className="p-3 bg-yellow-100 dark:bg-yellow-900 rounded-full">
+              <ClockIcon className="w-6 h-6 text-yellow-600 dark:text-yellow-400" />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700">
+          <div className="flex items-center justify-between">
+            <div>
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Average Amount</p>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">₹{summary.averageAmount.toLocaleString()}</p>
               <p className="text-sm text-gray-500 dark:text-gray-400">Per transaction</p>
@@ -274,12 +336,11 @@ export default function Payments() {
               className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
             >
               <option value="All">All Status</option>
-              <option value="Paid">Paid</option>
-              <option value="Completed">Completed</option>
-              <option value="Pending">Pending</option>
-              <option value="Failed">Failed</option>
-              <option value="Cancelled">Cancelled</option>
-              <option value="Refunded">Refunded</option>
+              <option value="PAID">Paid</option>
+              <option value="PENDING">Pending</option>
+              <option value="FAILED">Failed</option>
+              <option value="CANCELLED">Cancelled</option>
+              <option value="REFUNDED">Refunded</option>
             </select>
           </div>
           <div>
@@ -352,7 +413,7 @@ export default function Payments() {
         <div className="px-6 py-4 border-b border-gray-200 dark:border-slate-700">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Payment Transactions</h3>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            Showing {filteredPayments.length} of {payments.length} transactions
+            Showing {filteredPayments.length} of {pagination.total} transactions (Page {pagination.page} of {pagination.totalPages})
           </p>
         </div>
         <div className="overflow-x-auto">
@@ -360,6 +421,7 @@ export default function Payments() {
             <thead className="bg-gray-50 dark:bg-slate-700">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Member</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Products</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Amount</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Method</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
@@ -371,19 +433,19 @@ export default function Payments() {
             <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-700">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
+                  <td colSpan={8} className="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
                     <div className="animate-pulse">Loading payment transactions...</div>
                   </td>
                 </tr>
               ) : error ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-4 text-center text-red-500">
+                  <td colSpan={8} className="px-6 py-4 text-center text-red-500">
                     Error: {error}
                   </td>
                 </tr>
               ) : filteredPayments.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
+                  <td colSpan={8} className="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
                     No payment transactions found.
                   </td>
                 </tr>
@@ -398,6 +460,14 @@ export default function Payments() {
                         <div className="text-sm text-gray-500 dark:text-gray-400">
                           {payment.memberEmail}
                         </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900 dark:text-white">
+                        {payment.products?.[0]?.name || 'N/A'}
+                      </div>
+                      <div className="text-sm text-gray-500 dark:text-gray-400">
+                        Qty: {payment.products?.[0]?.quantity || 0}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 dark:text-white">
@@ -422,7 +492,7 @@ export default function Payments() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex items-center gap-2">
-                        {(payment.status === 'Paid' || payment.status === 'Completed') && (
+                        {payment.status === 'PAID' && (
                           <button
                             onClick={() => handleRefundPayment(payment.id)}
                             className="text-purple-600 hover:text-purple-900 dark:text-purple-400 dark:hover:text-purple-300"
@@ -451,10 +521,29 @@ export default function Payments() {
         </div>
       </div>
 
+      {/* Pagination */}
+      <div className="flex justify-between items-center my-4">
+        <button 
+          onClick={handlePrevPage} 
+          disabled={!pagination.hasPrev} 
+          className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
+        >
+          Previous
+        </button>
+        <span>Page {pagination.page} of {pagination.totalPages} (Total: {pagination.total})</span>
+        <button 
+          onClick={handleNextPage} 
+          disabled={!pagination.hasNext} 
+          className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
+        >
+          Next
+        </button>
+      </div>
+
       {/* Payment Detail Modal */}
       {showDetailModal && selectedPayment && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-slate-800 rounded-lg p-6 w-full max-w-md">
+          <div className="bg-white dark:bg-slate-800 rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Payment Details</h3>
               <button
@@ -464,54 +553,92 @@ export default function Payments() {
                 <XCircleIcon className="w-6 h-6" />
               </button>
             </div>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Member</label>
-                <p className="text-sm text-gray-900 dark:text-white">{selectedPayment.member}</p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Email</label>
-                <p className="text-sm text-gray-900 dark:text-white">{selectedPayment.memberEmail}</p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Amount</label>
-                <p className="text-sm font-bold text-gray-900 dark:text-white">₹{(selectedPayment.amount || 0).toLocaleString()}</p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Payment Method</label>
-                <span className={`inline-flex px-2 py-1 rounded-full text-xs font-semibold ${getMethodColor(selectedPayment.method)}`}>
-                  {selectedPayment.method}
-                </span>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Status</label>
-                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold ${getStatusColor(selectedPayment.status)}`}>
-                  {getStatusIcon(selectedPayment.status)}
-                  <span className="ml-1">{selectedPayment.status}</span>
-                </span>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Order ID</label>
-                <p className="text-sm text-gray-900 dark:text-white">#{selectedPayment.orderId}</p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Transaction Date</label>
-                <p className="text-sm text-gray-900 dark:text-white">
-                  {selectedPayment.createdAt ? new Date(selectedPayment.createdAt).toLocaleString() : 'N/A'}
-                </p>
-              </div>
-              {selectedPayment.items && selectedPayment.items.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Member Details */}
+              <div className="space-y-4">
+                <h4 className="font-semibold text-gray-900 dark:text-white border-b pb-2">Member Details</h4>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Items</label>
-                  <div className="space-y-1">
-                    {selectedPayment.items.map((item, index) => (
-                      <div key={index} className="text-sm text-gray-900 dark:text-white">
-                        {item.product?.name || 'Unknown Product'} x {item.quantity}
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Name</label>
+                  <p className="text-sm text-gray-900 dark:text-white">{selectedPayment.member}</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Email</label>
+                  <p className="text-sm text-gray-900 dark:text-white">{selectedPayment.memberEmail}</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Mobile</label>
+                  <p className="text-sm text-gray-900 dark:text-white">{selectedPayment.memberMobile || 'N/A'}</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Referral Code</label>
+                  <p className="text-sm text-gray-900 dark:text-white font-mono">{selectedPayment.memberReferralCode || 'N/A'}</p>
+                </div>
+              </div>
+
+              {/* Payment Details */}
+              <div className="space-y-4">
+                <h4 className="font-semibold text-gray-900 dark:text-white border-b pb-2">Payment Details</h4>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Amount</label>
+                  <p className="text-lg font-bold text-green-600 dark:text-green-400">₹{(selectedPayment.amount || 0).toLocaleString()}</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Payment Method</label>
+                  <span className={`inline-flex px-2 py-1 rounded-full text-xs font-semibold ${getMethodColor(selectedPayment.method)}`}>
+                    {selectedPayment.method}
+                  </span>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Status</label>
+                  <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold ${getStatusColor(selectedPayment.status)}`}>
+                    {getStatusIcon(selectedPayment.status)}
+                    <span className="ml-1">{selectedPayment.status}</span>
+                  </span>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Order ID</label>
+                  <p className="text-sm text-gray-900 dark:text-white">#{selectedPayment.orderId}</p>
+                </div>
+              </div>
+
+              {/* Product Details */}
+              <div className="md:col-span-2 space-y-4">
+                <h4 className="font-semibold text-gray-900 dark:text-white border-b pb-2">Product Details</h4>
+                {selectedPayment.products && selectedPayment.products.length > 0 ? (
+                  <div className="space-y-2">
+                    {selectedPayment.products.map((product, index) => (
+                      <div key={index} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-slate-700 rounded">
+                        <div>
+                          <span className="font-medium">{product.name}</span>
+                          <span className="text-sm text-gray-500 dark:text-gray-400 ml-2">x {product.quantity}</span>
+                        </div>
+                        <span className="font-semibold">₹{product.price}</span>
                       </div>
                     ))}
                   </div>
+                ) : (
+                  <p className="text-sm text-gray-500 dark:text-gray-400">No product information available</p>
+                )}
+              </div>
+
+              {/* Transaction Info */}
+              <div className="md:col-span-2 space-y-4">
+                <h4 className="font-semibold text-gray-900 dark:text-white border-b pb-2">Transaction Info</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Transaction Date</label>
+                    <p className="text-sm text-gray-900 dark:text-white">
+                      {selectedPayment.createdAt ? new Date(selectedPayment.createdAt).toLocaleString() : 'N/A'}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Last Updated</label>
+                    <p className="text-sm text-gray-900 dark:text-white">
+                      {selectedPayment.updatedAt ? new Date(selectedPayment.updatedAt).toLocaleString() : 'N/A'}
+                    </p>
+                  </div>
                 </div>
-              )}
+              </div>
             </div>
           </div>
         </div>
