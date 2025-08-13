@@ -165,10 +165,10 @@ export default function Payouts({ setPayoutNotificationCount }) {
 
       const order = orderData.data;
       
-      // Initialize Razorpay payment
-      const options = {
-        key: process.env.REACT_APP_RAZORPAY_KEY_ID || 'rzp_test_51HqjWmKgnvOcbXg', // Use your Razorpay key
-        amount: order.amount,
+              // Initialize Razorpay payment
+        const options = {
+          key: process.env.REACT_APP_RAZORPAY_KEY_ID || 'rzp_test_JNLEoGZvX3AWac', // Use your Razorpay key
+          amount: order.amount,
         currency: order.currency || 'INR',
         name: 'CamelQ Software Solutions',
         description: `Payout for ${selectedRedeemRequest.user.name}`,
