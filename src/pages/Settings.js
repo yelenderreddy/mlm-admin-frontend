@@ -263,7 +263,7 @@
 //     </div>
 //   );
 // } 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 
 export default function Settings() {
   const [tab, setTab] = useState("privacy");
@@ -300,9 +300,9 @@ export default function Settings() {
   // Fetch existing data
   useEffect(() => {
     fetchExistingData();
-  }, []);
+  }, [fetchExistingData]);
 
-  const fetchExistingData = async () => {
+  const fetchExistingData = useCallback(async () => {
     try {
       // Fetch active privacy policy
       const privacyResponse = await fetch(`${API_BASE_URL}/privacy/active`, {
@@ -341,7 +341,7 @@ export default function Settings() {
     } catch (error) {
       console.error("Error fetching data:", error);
     }
-  };
+  }, []);
 
   const handleAddFaq = async () => {
     if (faqQuestion && faqAnswer) {

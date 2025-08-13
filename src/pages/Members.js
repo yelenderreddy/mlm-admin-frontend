@@ -169,29 +169,7 @@ const handleDelete = async (memberId) => {
 };
 
 
-  // Export CSV
-  const handleExportCSV = () => {
-    const header = ["Name", "Email", "Phone", "Referral Code", "Referral Count", "Wallet ₹", "Status", "Joined On", "Role"];
-    const rows = filteredMembers.map((m) => [
-      m.name, 
-      m.email, 
-      m.phone, 
-      m.referralCode, 
-      m.referralCount, 
-      m.wallet, 
-      m.status, 
-      m.joinedOn,
-      m.role
-    ]);
-    const csv = [header, ...rows].map((r) => r.join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `members_${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
+
 
   // Filter logic (unchanged)
   const filteredMembers = members.filter((m) => {

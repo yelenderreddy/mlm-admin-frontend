@@ -24,12 +24,6 @@ export default function Orders() {
   const [showProductModal, setShowProductModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [selectedProduct, setSelectedProduct] = useState(null);
-  const [summary, setSummary] = useState({
-    totalOrders: 0,
-    totalRevenue: 0,
-    pendingOrders: 0,
-    completedOrders: 0,
-  });
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 10,

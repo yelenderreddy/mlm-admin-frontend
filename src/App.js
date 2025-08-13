@@ -72,12 +72,10 @@ function Header({ onMenuClick, dark, setDark, payoutNotificationCount, notificat
 
   // Mark notifications as read when opened
   useEffect(() => {
-    if (notifOpen) {
-      if (setNotifications) {
-        setNotifications((prev) => prev.map(n => ({ ...n, read: true })));
-      }
+    if (notifOpen && setNotifications) {
+      setNotifications((prev) => prev.map(n => ({ ...n, read: true })));
     }
-  }, [notifOpen]);
+  }, [notifOpen, setNotifications]);
   // Logout handler
   const handleLogout = () => {
     localStorage.removeItem("adminToken");

@@ -1,5 +1,5 @@
 // Sidebar navigation links for admin dashboard
-import { Bars3Icon, UsersIcon, ShoppingBagIcon, CreditCardIcon, CurrencyDollarIcon, Cog6ToothIcon, GiftIcon, ChartBarIcon, UserGroupIcon, ArrowTrendingUpIcon } from '@heroicons/react/24/outline';
+import { Bars3Icon, UsersIcon, ShoppingBagIcon, CreditCardIcon, CurrencyDollarIcon, Cog6ToothIcon, GiftIcon, UserGroupIcon, ArrowTrendingUpIcon } from '@heroicons/react/24/outline';
 
 export const sidebarLinks = [
   { name: 'Dashboard', icon: Bars3Icon },

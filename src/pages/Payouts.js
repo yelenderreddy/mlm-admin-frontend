@@ -14,8 +14,6 @@ import { logDebug, logError } from '../config';
 
 export default function Payouts({ setPayoutNotificationCount }) {
   const [redeemRequests, setRedeemRequests] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [selectedRedeemRequest, setSelectedRedeemRequest] = useState(null);
   const [showRedeemDetailModal, setShowRedeemDetailModal] = useState(false);
   const [showStatusUpdateModal, setShowStatusUpdateModal] = useState(false);
@@ -60,7 +58,7 @@ export default function Payouts({ setPayoutNotificationCount }) {
       logError('Failed to fetch redeem requests', err);
       setRedeemRequests([]);
     }
-  }, []);
+  }, [setPayoutNotificationCount]);
 
 
 

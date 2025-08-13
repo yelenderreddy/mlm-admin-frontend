@@ -164,7 +164,7 @@ export default function GiftManagement() {
         throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
       }
 
-      const result = await response.json();
+      await response.json(); // Response not used, just await for completion
 
       await fetchRewardTargets(); // Refresh data
       setShowCreateModal(false);
