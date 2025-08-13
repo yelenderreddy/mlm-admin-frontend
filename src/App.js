@@ -73,8 +73,8 @@ function Header({ onMenuClick, dark, setDark, payoutNotificationCount, notificat
   // Mark notifications as read when opened
   useEffect(() => {
     if (notifOpen && setNotifications) {
-      setNotifications((prev) => prev.map(n => ({ ...n, read: true })));
-    }
+        setNotifications((prev) => prev.map(n => ({ ...n, read: true })));
+      }
   }, [notifOpen, setNotifications]);
   // Logout handler
   const handleLogout = () => {
