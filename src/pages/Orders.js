@@ -109,39 +109,12 @@ export default function Orders() {
     }
   }, []);
 
-  // Fetch order statistics
-  const fetchOrderStats = useCallback(async () => {
-    try {
-      logDebug('Fetching order statistics');
-      
-      const response = await fetch(ADMIN_ENDPOINTS.ORDERS.STATS, {
-        headers: getAdminHeaders()
-      });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      logDebug('Order stats received', data);
-      
-      setSummary({
-        totalOrders: data.totalOrders || 0,
-        totalRevenue: data.totalRevenue || 0,
-        pendingOrders: data.pendingOrders || 0,
-        completedOrders: data.completedOrders || 0,
-      });
-    } catch (err) {
-      logError('Failed to fetch order stats', err);
-      // Keep default values if stats fail
-    }
-  }, []);
 
   // Load data on component mount and when pagination changes
   useEffect(() => {
     fetchOrders(pagination.page, pagination.limit);
-    fetchOrderStats();
-  }, [fetchOrders, fetchOrderStats, pagination.page, pagination.limit]);
+  }, [fetchOrders, pagination.page, pagination.limit]);
 
   // Pagination controls
   const handlePrevPage = () => {
