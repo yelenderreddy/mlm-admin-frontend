@@ -297,11 +297,6 @@ export default function Settings() {
     };
   };
 
-  // Fetch existing data
-  useEffect(() => {
-    fetchExistingData();
-  }, [fetchExistingData]);
-
   const fetchExistingData = useCallback(async () => {
     try {
       // Fetch active privacy policy
@@ -342,6 +337,11 @@ export default function Settings() {
       console.error("Error fetching data:", error);
     }
   }, []);
+
+  // Fetch existing data
+  useEffect(() => {
+    fetchExistingData();
+  }, [fetchExistingData]);
 
   const handleAddFaq = async () => {
     if (faqQuestion && faqAnswer) {
