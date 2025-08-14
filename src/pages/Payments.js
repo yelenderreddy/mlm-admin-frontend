@@ -68,7 +68,7 @@ export default function Payments() {
       
       if (responseData.data && responseData.data.orders) {
         const transformedPayments = responseData.data.orders.map(order => ({
-          id: order.id,
+        id: order.id,
           member: order.userName || 'Unknown User',
           memberId: order.userId,
           memberEmail: order.userEmail,
@@ -77,12 +77,12 @@ export default function Payments() {
           memberGender: order.userGender,
           memberReferralCode: order.userReferralCode,
           amount: (order.productPrice || 0) * order.quantity,
-          method: order.paymentMethod || 'Cash',
+        method: order.paymentMethod || 'Cash',
           status: order.userPaymentStatus || 'Pending',
-          orderId: order.id,
+        orderId: order.id,
           orderStatus: order.status || 'Pending',
           createdAt: order.orderedAt,
-          updatedAt: order.updatedAt,
+        updatedAt: order.updatedAt,
           products: [{
             id: order.productId,
             name: order.productName,
@@ -555,16 +555,16 @@ export default function Payments() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Member Details */}
-              <div className="space-y-4">
+            <div className="space-y-4">
                 <h4 className="font-semibold text-gray-900 dark:text-white border-b pb-2">Member Details</h4>
-                <div>
+              <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Name</label>
-                  <p className="text-sm text-gray-900 dark:text-white">{selectedPayment.member}</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Email</label>
-                  <p className="text-sm text-gray-900 dark:text-white">{selectedPayment.memberEmail}</p>
-                </div>
+                <p className="text-sm text-gray-900 dark:text-white">{selectedPayment.member}</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Email</label>
+                <p className="text-sm text-gray-900 dark:text-white">{selectedPayment.memberEmail}</p>
+              </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Mobile</label>
                   <p className="text-sm text-gray-900 dark:text-white">{selectedPayment.memberMobile || 'N/A'}</p>
@@ -578,27 +578,27 @@ export default function Payments() {
               {/* Payment Details */}
               <div className="space-y-4">
                 <h4 className="font-semibold text-gray-900 dark:text-white border-b pb-2">Payment Details</h4>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Amount</label>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Amount</label>
                   <p className="text-lg font-bold text-green-600 dark:text-green-400">₹{(selectedPayment.amount || 0).toLocaleString()}</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Payment Method</label>
-                  <span className={`inline-flex px-2 py-1 rounded-full text-xs font-semibold ${getMethodColor(selectedPayment.method)}`}>
-                    {selectedPayment.method}
-                  </span>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Status</label>
-                  <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold ${getStatusColor(selectedPayment.status)}`}>
-                    {getStatusIcon(selectedPayment.status)}
-                    <span className="ml-1">{selectedPayment.status}</span>
-                  </span>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Order ID</label>
-                  <p className="text-sm text-gray-900 dark:text-white">#{selectedPayment.orderId}</p>
-                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Payment Method</label>
+                <span className={`inline-flex px-2 py-1 rounded-full text-xs font-semibold ${getMethodColor(selectedPayment.method)}`}>
+                  {selectedPayment.method}
+                </span>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Status</label>
+                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold ${getStatusColor(selectedPayment.status)}`}>
+                  {getStatusIcon(selectedPayment.status)}
+                  <span className="ml-1">{selectedPayment.status}</span>
+                </span>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Order ID</label>
+                <p className="text-sm text-gray-900 dark:text-white">#{selectedPayment.orderId}</p>
+              </div>
               </div>
 
               {/* Product Details */}
@@ -625,20 +625,20 @@ export default function Payments() {
               <div className="md:col-span-2 space-y-4">
                 <h4 className="font-semibold text-gray-900 dark:text-white border-b pb-2">Transaction Info</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Transaction Date</label>
-                    <p className="text-sm text-gray-900 dark:text-white">
-                      {selectedPayment.createdAt ? new Date(selectedPayment.createdAt).toLocaleString() : 'N/A'}
-                    </p>
-                  </div>
-                  <div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Transaction Date</label>
+                <p className="text-sm text-gray-900 dark:text-white">
+                  {selectedPayment.createdAt ? new Date(selectedPayment.createdAt).toLocaleString() : 'N/A'}
+                </p>
+              </div>
+                <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Last Updated</label>
                     <p className="text-sm text-gray-900 dark:text-white">
                       {selectedPayment.updatedAt ? new Date(selectedPayment.updatedAt).toLocaleString() : 'N/A'}
                     </p>
+                      </div>
                   </div>
                 </div>
-              </div>
             </div>
           </div>
         </div>
