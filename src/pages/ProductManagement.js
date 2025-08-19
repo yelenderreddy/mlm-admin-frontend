@@ -749,27 +749,30 @@ export default function ProductManagement() {
 
   // -- CREATE (ADD) PRODUCT HANDLER
   async function createProduct(productData) {
-    const payload = {
-      products: [
-        {
-          productName: productData.name,
-          productCount: Number(productData.count) || 1,
-          productCode:
-            productData.code && String(productData.code).length > 0
+    const formData = new FormData();
+    
+    // Add product fields
+    formData.append('productName', productData.name);
+    formData.append('productCount', Number(productData.count) || 1);
+    formData.append('productCode', productData.code && String(productData.code).length > 0
               ? Number(productData.code)
-              : Math.floor(1000 + Math.random() * 9000),
-          productPrice: Number(productData.price),
-        },
-      ],
-    };
-    const res = await fetch(`${BASE_URL}/product/add-multiple`, {
+      : Math.floor(1000 + Math.random() * 9000));
+    formData.append('productPrice', Number(productData.price));
+    formData.append('description', productData.description || '');
+    
+    // Add photo
+    if (productData.images && productData.images.length > 0) {
+      formData.append('photo', productData.images[0]);
+    }
+
+    const res = await fetch(`${BASE_URL}/product/add-with-photo`, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
         Authorization: `Bearer ${getAdminToken()}`,
       },
-      body: JSON.stringify(payload),
+      body: formData
     });
+
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.message || "Failed to add product");
@@ -785,20 +788,11 @@ export default function ProductManagement() {
         alert("Name, price and count are required.");
         return;
       }
+
+      // Create product with photo using the correct endpoint
       const response = await createProduct(editFields);
-      // Upload images if any
-      if (editFields.images.length > 0 && response.data?.[0]?.id) {
-        const formData = new FormData();
-        editFields.images.forEach((img) => formData.append("images", img));
-        await fetch(`${BASE_URL}/product/${response.data[0].id}/images`, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${getAdminToken()}`,
-            // Don't set Content-Type for FormData!
-          },
-          body: formData,
-        });
-      }
+      
+      // No need for separate image upload - it's already handled!
       setModal({ open: false, mode: null, product: null });
       fetchProducts();
       alert(response.message || "Product created successfully!");

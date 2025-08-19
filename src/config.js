@@ -13,12 +13,12 @@ export const sidebarLinks = [
   { name: 'Gift Management', icon: GiftIcon },
   { name: 'Settings', icon: Cog6ToothIcon },
 ];
-export const BASE_URL = "http://localhost:3000";
+export const BASE_URL = "http://54.234.251.28:3000";
 
 export const config = {
   API: {
-    BASE_URL: "http://localhost:3000",
-    FRONTEND_URL: "http://localhost:3000",
+    BASE_URL: "http://54.234.251.28:3000",
+    FRONTEND_URL: "http://54.234.251.28:3000",
     TIMEOUT: 30000,
   },
   AUTH: {
